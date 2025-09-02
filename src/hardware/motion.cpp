@@ -94,6 +94,7 @@
 
 bma_config_t bma_config;
 callback_t *bma_callback = NULL;
+Accel accel;
 
 bool first_loop_run = true;
 
@@ -641,6 +642,10 @@ void bma_set_rotate_tilt( uint32_t rotation ) {
 
 uint32_t bma_get_stepcounter( void ) {
     return stepcounter + stepcounter_before_reset;
+}
+
+bma::Accel bma_get_accel(){
+
 }
 
 void bma_reset_stepcounter( void ) {
