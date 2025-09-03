@@ -93,5 +93,12 @@
      * @brief reset the stepcounter value
      */
     void bma_reset_stepcounter( void );
+
+    /*
+    * @brief wrapper for returning raw accelerometer values from bma
+    * 
+    */
+    Accel bma_get_accel(void);
+
     
 #endif // _MOTION_H

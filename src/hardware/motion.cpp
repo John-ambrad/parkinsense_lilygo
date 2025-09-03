@@ -28,6 +28,7 @@
 #include "callback.h"
 #include "utils/alloc.h"
 
+
 #ifdef NATIVE_64BIT
     #include "utils/logging.h"
 
@@ -644,8 +645,12 @@ uint32_t bma_get_stepcounter( void ) {
     return stepcounter + stepcounter_before_reset;
 }
 
-bma::Accel bma_get_accel(){
 
+Accel bma_get_accel() {
+    Accel accel;
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    ttgo->bma->getAccel(accel);
+    return accel;
 }
 
 void bma_reset_stepcounter( void ) {
