@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <time.h>
 
+
+#include "drive/bma423/bma.h"
 #include "motion.h"
 #include "powermgm.h"
 #include "callback.h"
@@ -95,8 +97,6 @@
 
 bma_config_t bma_config;
 callback_t *bma_callback = NULL;
-Accel accel;
-
 bool first_loop_run = true;
 
 bool bma_send_event_cb( EventBits_t event, void *arg );
@@ -650,6 +650,8 @@ Accel bma_get_accel() {
     Accel accel;
     TTGOClass *ttgo = TTGOClass::getWatch();
     ttgo->bma->getAccel(accel);
+    //remove later but we will snprintf here in this function// 
+    Serial.printf("X: %d, Y: %d, Z: %d\n", accel.x, accel.y, accel.z);
     return accel;
 }
 

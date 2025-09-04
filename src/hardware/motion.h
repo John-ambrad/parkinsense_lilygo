@@ -24,7 +24,8 @@
 
     #include "callback.h"
     #include "hardware/config/bmaconfig.h"
-    
+    #include "drive/bma423/bma.h"
+
     #define BMACTL_EVENT_INT            _BV(0)              /** @brief event mask for bma interrupt */
     #define BMACTL_DOUBLECLICK          _BV(1)              /** @brief event mask for an doubleclick event */
     #define BMACTL_STEPCOUNTER          _BV(2)              /** @brief event mask for an stepcounter update event, callback arg is (uint32*) */
