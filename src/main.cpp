@@ -41,5 +41,5 @@ void setup() {
 
 void loop(){
     powermgm_loop();
-    bma_get_accel();
+    
 }

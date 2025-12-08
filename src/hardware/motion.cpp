@@ -161,6 +161,7 @@ void bma_setup( void ) {
              * init stepcounter
              */
             ttgo->bma->begin();
+            log_i("[DEBUG] BMA423 initialized manually");
             ttgo->bma->attachInterrupt();
             ttgo->bma->direction();
             /*
@@ -374,11 +375,15 @@ bool bma_powermgm_loop_cb( EventBits_t event , void *arg ) {
 
 void bma_notify_stepcounter( void ) {
     uint32_t val = 0;
+
+    log_i("Entered function: bma_notify_stepcounter");
     #ifdef NATIVE_64BIT
+    log_i("Emulator is running");
     #else
         #ifdef M5PAPER
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
+            log_d('Over here 0');
             stepcounter_before_reset = ttgo->bma->getCounter();
         #elif defined( LILYGO_WATCH_2021 )
             stepcounter_before_reset = bma.getCounter();
@@ -646,13 +651,13 @@ uint32_t bma_get_stepcounter( void ) {
 }
 
 
-Accel bma_get_accel() {
+bma_accel_data_t bma_get_accel() {
     Accel accel;
     TTGOClass *ttgo = TTGOClass::getWatch();
     ttgo->bma->getAccel(accel);
     //remove later but we will snprintf here in this function// 
-    Serial.printf("X: %d, Y: %d, Z: %d\n", accel.x, accel.y, accel.z);
-    return accel;
+    // Serial.printf("X: %d, Y: %d, Z: %d\n", accel.x, accel.y, accel.z);
+    return {accel.x, accel.y, accel.z};
 }
 
 void bma_reset_stepcounter( void ) {

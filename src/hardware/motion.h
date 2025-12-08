@@ -95,11 +95,28 @@
      */
     void bma_reset_stepcounter( void );
 
-    /*
+
+    /**
+     * @brief common struct to return raw acceleromter values
+     */
+    typedef struct{
+
+        int16_t x;
+        int16_t y;
+        int16_t z;
+        //Should I add the time stamp?
+        //float 
+
+
+    } bma_accel_data_t;
+
+    /** 
     * @brief wrapper for returning raw accelerometer values from bma
     * 
     */
-    Accel bma_get_accel(void);
+    bma_accel_data_t bma_get_accel(void);
+
+
 
     
 #endif // _MOTION_H
