@@ -1,6 +1,6 @@
 #include "unity.h"
-#include "../src/utils/circular_buff.h"
-
+#include "../src/utils/circular_buff.cpp"   // include the implementation directly
+#include "utils/circular_buff.h"           // include the header
 void setUp(void){
 
 }
@@ -11,6 +11,13 @@ void tearDown(void){
 
 //BASIC LOGIC AND FUNCTIONAL TESTING//
 void test_circular_buffer_empty_after_init(){
+
+    circular_buff_t buff;
+
+    circular_buff_init(&buff);
+
+    TEST_ASSERT_TRUE(circular_buff_empty(&buff));
+    
 
 
 }
@@ -54,5 +61,7 @@ void test_circular_buffer_get(){
 
 int main(int argc, char **argv) {
     UNITY_BEGIN();
+
+    RUN_TEST(test_circular_buffer_empty_after_init);
     UNITY_END();
 }
