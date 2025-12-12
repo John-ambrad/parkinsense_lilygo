@@ -4,7 +4,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-
+#include "../hardware/motion.h" //using bma_accel_t struct
 
 
 
