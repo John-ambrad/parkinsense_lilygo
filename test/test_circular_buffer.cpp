@@ -1,12 +1,80 @@
 #include "unity.h"
 #include "../src/utils/circular_buff.cpp"   // include the implementation directly
 #include "utils/circular_buff.h"           // include the header
+#include <stdint.h>
+
+#define MAX_G 2047
+#define MIN_G -2048
+
+// STRUCT FOR PSEUDORANDOM NUMBER GENERATOR //
+typedef struct {
+    uint32_t state;
+} rng_t;
+
+
+
+
+
 void setUp(void){
 
 }
 
 void tearDown(void){
 
+}
+
+// HELPER FUNCTIONS //
+
+static inline void rng_seed(rng_t *rng, uint32_t seed)
+{
+    rng->state = seed ? seed : 0xDEADBEEF;
+}
+
+static inline uint32_t rng_next(rng_t *rng)
+{
+    uint32_t x = rng->state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    rng->state = x;
+    return x;
+}
+
+static int16_t clamp_12bit(int32_t v)
+{
+    if (v > MAX_G) return MAX_G;
+    if (v < MIN_G) return MIN_G;
+    return (int16_t)v;
+}
+
+bma_accel_data_t gen_mock_val(void)
+{
+    static rng_t rng;
+    static uint32_t ts = 0;
+    static int seeded = 0;
+
+    if (!seeded) {
+        rng_seed(&rng, 1234); // deterministic seed
+        ts = 0;
+        seeded = 1;
+    }
+
+    bma_accel_data_t v;
+
+    v.x = clamp_12bit((int32_t)((rng_next(&rng) & 0x0FFF) - 2048));
+    v.y = clamp_12bit((int32_t)((rng_next(&rng) & 0x0FFF) - 2048));
+    v.z = clamp_12bit((int32_t)((rng_next(&rng) & 0x0FFF) - 2048));
+
+    v.timestamp_ms = ts;
+    ts += 40; // assuming 50 Hz sample rate
+
+    return v;
+}
+
+
+void gen_mock_array(bma_accel_data_t* arr, int n) {
+    for (int i=0;i<n;i++)
+        arr[i] = gen_mock_val();
 }
 
 //BASIC LOGIC AND FUNCTIONAL TESTING//
@@ -74,9 +142,56 @@ void test_circular_buffer_read(){
 }
 
 
-void test_circular_buffer_remove(){
+void test_circular_buffer_write_seq(){
+
+    circular_buff_t buff;
+    circular_buff_init(&buff);
+    int num_samples = 100;
+
+    bma_accel_data_t mock_val_arr[num_samples];
+
+    gen_mock_array(mock_val_arr,num_samples);
+
+    for(int s = 0; s<num_samples;s++){
+        circular_buff_write(mock_val_arr[s],&buff);
+    }
+
+    TEST_ASSERT_EQUAL_INT(num_samples,buff.head);
+    TEST_ASSERT_EQUAL_INT(num_samples,buff.count);
+    TEST_ASSERT_EQUAL_INT(0,buff.tail);
+
+
 
 }
+
+void test_circular_buff_read_seq(){
+
+    circular_buff_t buff;
+    circular_buff_init(&buff);
+    int num_samples = 100;
+
+    bma_accel_data_t mock_val_arr[num_samples];
+    gen_mock_array(mock_val_arr,num_samples);
+
+    for(int s = 0; s<num_samples; s++){
+        circular_buff_write(mock_val_arr[s],&buff);
+    }
+
+    for(int s = 0; s<num_samples; s++){
+        bma_accel_data_t stored_samp = circular_buff_read(&buff);
+        TEST_ASSERT_EQUAL_INT16(mock_val_arr[s].x,stored_samp.x);
+        TEST_ASSERT_EQUAL_INT16(mock_val_arr[s].y,stored_samp.y);
+        TEST_ASSERT_EQUAL_INT16(mock_val_arr[s].z,stored_samp.z);
+        TEST_ASSERT_EQUAL_INT32(mock_val_arr[s].timestamp_ms,stored_samp.timestamp_ms);
+        
+    }
+
+    TEST_ASSERT_EQUAL_INT(num_samples,buff.tail);
+    TEST_ASSERT_EQUAL_INT(0,buff.count);
+    TEST_ASSERT_EQUAL_INT(num_samples,buff.head);
+
+}
+
 
 void test_circular_buffer_full(){
     //checks that the counter is implementing correctly 
@@ -86,7 +201,12 @@ void test_circular_buffer_full(){
 
 }
 
+void test_circular_buffer_limit(){
+    
+}
+
 void test_circular_buffer_overflow(){
+    // check the old data is overwritten during overflow //
 
 
 
@@ -106,5 +226,8 @@ int main(int argc, char **argv) {
     RUN_TEST(test_circular_buffer_empty_after_init);
     RUN_TEST(test_circular_buffer_write);
     RUN_TEST(test_circular_buffer_read);
+    RUN_TEST(test_circular_buffer_write_seq);
+    RUN_TEST(test_circular_buff_read_seq);
+
     UNITY_END();
 }
