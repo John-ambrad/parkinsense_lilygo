@@ -192,12 +192,115 @@ void test_circular_buff_read_seq(){
 
 }
 
+void test_circular_buffer_sequential_readwrite(void)
+{
+    circular_buff_t buff;
+    circular_buff_init(&buff);
+
+    const int n = 100;
+
+    bma_accel_data_t a[n];
+    bma_accel_data_t b[n];
+
+    gen_mock_array(a, n);
+    gen_mock_array(b, n);
+
+    /* -------------------------------------------------
+     * Phase 1: Write A
+     * ------------------------------------------------- */
+    for (int i = 0; i < n; i++) {
+        circular_buff_write(a[i], &buff);
+    }
+
+    /* -------------------------------------------------
+     * Phase 2: Read half of A
+     * ------------------------------------------------- */
+    for (int i = 0; i < n / 2; i++) {
+        bma_accel_data_t out = circular_buff_read(&buff);
+
+        TEST_ASSERT_EQUAL_MEMORY(
+            &a[i],
+            &out,
+            sizeof(bma_accel_data_t)
+        );
+    }
+
+    /* -------------------------------------------------
+     * Phase 3: Write B
+     * ------------------------------------------------- */
+    for (int i = 0; i < n; i++) {
+        circular_buff_write(b[i], &buff);
+    }
+
+    /* -------------------------------------------------
+     * Phase 4: Read remainder of A
+     * ------------------------------------------------- */
+    for (int i = n / 2; i < n; i++) {
+        bma_accel_data_t out = circular_buff_read(&buff);
+
+        TEST_ASSERT_EQUAL_MEMORY(
+            &a[i],
+            &out,
+            sizeof(bma_accel_data_t)
+        );
+    }
+
+    /* -------------------------------------------------
+     * Phase 5: Read all of B
+     * ------------------------------------------------- */
+    for (int i = 0; i < n; i++) {
+        bma_accel_data_t out = circular_buff_read(&buff);
+
+        TEST_ASSERT_EQUAL_MEMORY(
+            &b[i],
+            &out,
+            sizeof(bma_accel_data_t)
+        );
+    }
+}
+
 
 void test_circular_buffer_full(){
     //checks that the counter is implementing correctly 
     //to test this have a fixed size circular buffer
     //count == known fixed size then the counter is working properly
     //also test to see that it will erase/overwrite old data?
+
+    circular_buff_t buff;
+    circular_buff_init(&buff);
+    const int max_samples = 1025;
+
+    bma_accel_data_t random_data[max_samples];
+    
+    gen_mock_array(random_data,max_samples);
+
+    bma_accel_data_t first_sample = random_data[0];
+
+    for(int i = 0; i<max_samples; i++){
+        circular_buff_write(random_data[i],&buff);
+    }
+
+    // gather what the wrap around is gonna be? //
+
+    bma_accel_data_t first_sample_wrap = buff.buffer[0];
+
+    TEST_ASSERT_EQUAL_INT16(first_sample.x,first_sample_wrap.x);
+    
+    TEST_ASSERT_EQUAL_INT16(first_sample.y,first_sample_wrap.y);
+    
+    TEST_ASSERT_EQUAL_INT16(first_sample.z,first_sample_wrap.z);
+    
+    TEST_ASSERT_EQUAL_INT16(first_sample.timestamp_ms,first_sample_wrap.timestamp_ms);
+
+
+
+
+    
+
+
+
+
+
 
 }
 
@@ -228,6 +331,7 @@ int main(int argc, char **argv) {
     RUN_TEST(test_circular_buffer_read);
     RUN_TEST(test_circular_buffer_write_seq);
     RUN_TEST(test_circular_buff_read_seq);
+    RUN_TEST(test_circular_buffer_sequential_readwrite);
 
     UNITY_END();
 }

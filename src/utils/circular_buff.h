@@ -29,6 +29,6 @@ typedef struct circular_buff_s {
 void circular_buff_init(circular_buff_t* circ_buff);
 void circular_buff_write(bma_accel_data_t input, circular_buff_t* circ_buff);
 bool circular_buff_empty(circular_buff_t* circ_buff);
-bma_accel_data_t circular_buff_read(circular_buff_t* circ_buff);
+bool circular_buff_read(circular_buff_t* circ_buff, bma_accel_data_t* out);
 
 #endif

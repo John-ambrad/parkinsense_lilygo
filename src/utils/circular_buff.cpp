@@ -10,21 +10,36 @@ bool circular_buff_empty(circular_buff_t* circ_buff){
     return circ_buff->count == 0;
 }
 
-void circular_buff_write(bma_accel_data_t input, circular_buff_t* circ_buff){
+void circular_buff_write(bma_accel_data_t input, circular_buff_t* circ_buff)
+{
+    assert(circ_buff != NULL);
+    assert(circ_buff->count <= BUFFER_SIZE);
+
     if (circ_buff->count < BUFFER_SIZE) {
+        // buffer not full, normal write
         circ_buff->buffer[circ_buff->head] = input;
         circ_buff->count++;
-        circ_buff->head = (circ_buff->head+1) % BUFFER_SIZE;
+        circ_buff->head = (circ_buff->head + 1) % BUFFER_SIZE;
     } else {
+        // buffer full, overwrite oldest
         circ_buff->buffer[circ_buff->head] = input;
-        circ_buff->head = (circ_buff->head+1) % BUFFER_SIZE;
-        circ_buff->tail = (circ_buff->tail+1) % BUFFER_SIZE;
+        circ_buff->head = (circ_buff->head + 1) % BUFFER_SIZE;
+        circ_buff->tail = (circ_buff->tail + 1) % BUFFER_SIZE;
     }
 }
 
-bma_accel_data_t circular_buff_read(circular_buff_t* circ_buff){
-    bma_accel_data_t out = circ_buff->buffer[circ_buff->tail];
+
+bool circular_buff_read(circular_buff_t* circ_buff,bma_accel_data_t* out){
+
+    assert(circ_buff != NULL);
+    assert(out != NULL);
+    assert(circ_buff->count > 0);
+
+    if(circ_buff->count == 0){
+        return false;
+    }
+    *out = circ_buff->buffer[circ_buff->tail];
     circ_buff->tail = (circ_buff->tail+1) % BUFFER_SIZE;
     circ_buff->count--;
-    return out;
+    return true;
 }
