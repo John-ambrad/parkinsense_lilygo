@@ -1,5 +1,8 @@
 #include "circular_buff.h"
 
+#define NDEBUG
+#include <assert.h>
+
 void circular_buff_init(circular_buff_t* circ_buff){
     circ_buff->head = 0;
     circ_buff->tail = 0;
