@@ -22,6 +22,7 @@
 #include "config.h"
 #include <stdio.h>
 #include <time.h>
+#include <sys/time.h>
 
 
 #include "drive/bma423/bma.h"
@@ -655,9 +656,10 @@ bma_accel_data_t bma_get_accel() {
     Accel accel;
     TTGOClass *ttgo = TTGOClass::getWatch();
     ttgo->bma->getAccel(accel);
-    //remove later but we will snprintf here in this function// 
-    // Serial.printf("X: %d, Y: %d, Z: %d\n", accel.x, accel.y, accel.z);
-    return {accel.x, accel.y, accel.z};
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    uint32_t timestamp_ms = (uint32_t)(tv.tv_sec * 1000UL + tv.tv_usec / 1000);
+    return {accel.x, accel.y, accel.z, timestamp_ms};
 }
 
 void bma_reset_stepcounter( void ) {
