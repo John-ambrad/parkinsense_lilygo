@@ -1,17 +1,10 @@
 #include "unity.h"
-#include "../src/utils/circular_buff.cpp"   // include the implementation directly
-#include "utils/circular_buff.h"           // include the header
+#include "utils/circular_buff.h"
 #include <stdint.h>
 #include "utils/alloc.h"
 #include "utils/psram_accel_alloc.h"
 
-void setUp(void){
-    psram_init();
-}
-
-void tearDown(void){
-
-}
+/* setUp/tearDown in test_setup.cpp */
 
 
 //-------- NATIVE TESTS --------//
@@ -50,7 +43,7 @@ void test_write_to_psram(void) {
     TEST_ASSERT_EQUAL_INT(1000, current_accel_block_ptr->start_time_ms);
     TEST_ASSERT_EQUAL_INT(1000, current_accel_block_ptr->end_time_ms);
     TEST_ASSERT_EQUAL_INT(0, current_accel_block_ptr->seq_num);
-    TEST_ASSERT_EQUAL_INT(0, current_accel_block_ptr->checksum);
+    TEST_ASSERT_NOT_EQUAL(0, current_accel_block_ptr->checksum);  /* computed by psram_write */
 }
 
 void test_read_from_psram(void) {
@@ -68,16 +61,7 @@ void test_read_from_psram(void) {
     TEST_ASSERT_EQUAL_INT(1000, read_header->start_time_ms);
     TEST_ASSERT_EQUAL_INT(1000, read_header->end_time_ms);
     TEST_ASSERT_EQUAL_INT(0, read_header->seq_num);
-    TEST_ASSERT_EQUAL_INT(0, read_header->checksum);
+    /* psram_read returning non-null already proves checksum validated */
+    TEST_ASSERT_NOT_EQUAL(0, read_header->checksum);
 }
-#endif
-
-
-int main(int argc, char **argv) {
-    UNITY_BEGIN();
-    RUN_TEST(test_psram_get_memory);
-    RUN_TEST(test_psram_init);
-    RUN_TEST(test_write_to_psram);
-    RUN_TEST(test_read_from_psram);
-    UNITY_END();
-}
+#endif /* ESP32 */

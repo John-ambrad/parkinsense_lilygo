@@ -4,7 +4,19 @@
 #include <stddef.h>
 #include <string.h>
 
-
+/* Single definition of RTC globals.
+ * On ESP32 these live in .noinit (survive reset); on native they're regular globals. */
+#ifdef NATIVE_64BIT
+header_t* current_accel_block_ptr = nullptr;
+header_t* first_accel_block_ptr = nullptr;
+uint32_t accel_block_valid_magic = 0;
+uint32_t accel_seq_counter = 0;
+#else
+__NOINIT_ATTR header_t* current_accel_block_ptr;
+__NOINIT_ATTR header_t* first_accel_block_ptr;
+__NOINIT_ATTR uint32_t accel_block_valid_magic;
+__NOINIT_ATTR uint32_t accel_seq_counter;
+#endif
 
 // what exactly am i doing here?
 // so we take data from circ

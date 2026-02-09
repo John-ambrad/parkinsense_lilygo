@@ -7,12 +7,7 @@
 
 
 #ifdef NATIVE_64BIT
-typedef struct {
-    int16_t x;
-    int16_t y;
-    int16_t z;
-    uint32_t timestamp_ms;
-} bma_accel_data_t;
+#include "utils/circular_buff.h"  /* provides bma_accel_data_t */
 #else
 #include "../hardware/motion.h"
 #endif
@@ -21,6 +16,8 @@ typedef struct {
  *  is a valid accel block (not garbage or wrong pointer). Use when writing
  *  the header and when checking after wake from deep sleep. */
 #define PSRAM_ACCEL_HEADER_MAGIC  0xAC
+#define PSRAM_ACCEL_HEADER_VERSION  1
+
 
 // DEFINE HEADER STRUCTURE
 typedef struct header_t {
@@ -38,11 +35,11 @@ typedef struct header_t {
 } header_t;
 
 
-// RTC MEMORY ALLOCATION //
-__NOINIT_ATTR header_t* current_accel_block_ptr;
-__NOINIT_ATTR header_t* first_accel_block_ptr;
-__NOINIT_ATTR uint32_t accel_block_valid_magic;
-__NOINIT_ATTR uint32_t accel_seq_counter;
+// RTC MEMORY ALLOCATION (declared here, defined once in psram_accel_alloc.cpp) //
+extern header_t* current_accel_block_ptr;
+extern header_t* first_accel_block_ptr;
+extern uint32_t accel_block_valid_magic;
+extern uint32_t accel_seq_counter;
 
 // FUNCTIONS //
 header_t* psram_write(int num_elements, bma_accel_data_t* buf);
