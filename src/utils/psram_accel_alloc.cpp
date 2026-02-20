@@ -3,9 +3,13 @@
 #include <sys/time.h>
 #include <stddef.h>
 #include <string.h>
+#if defined(ESP32)
+#include <esp_attr.h>
+#endif
 
-/* Single definition of RTC globals.
- * On ESP32 these live in .noinit (survive reset); on native they're regular globals. */
+/* Single definition of globals for block list.
+ * On ESP32 these use __NOINIT_ATTR so they survive soft reset (PSRAM content intact).
+ * On native they're regular globals. */
 #ifdef NATIVE_64BIT
 header_t* current_accel_block_ptr = nullptr;
 header_t* first_accel_block_ptr = nullptr;
@@ -18,11 +22,9 @@ __NOINIT_ATTR uint32_t accel_block_valid_magic;
 __NOINIT_ATTR uint32_t accel_seq_counter;
 #endif
 
-// what exactly am i doing here?
-// so we take data from circ
-// allocate a malloc
-// memcpy to allocated malloc
-// to test see if block size is the same?
+/* Pipeline: circular buffer batches are written here as single-linked blocks in PSRAM.
+ * first_accel_block_ptr = oldest block; current_accel_block_ptr = latest; each
+ * header_t.next points to the next (newer) block; latest block has next == nullptr. */
 
 
 void psram_init(void){
@@ -90,7 +92,7 @@ static uint32_t checksum_block_for_validate(const void* ptr, size_t block_len){
 header_t* create_header(int num_elements, bma_accel_data_t* buf, void* ptr){
     header_t* h = (header_t*)ptr;
     h->magic_number = PSRAM_ACCEL_HEADER_MAGIC;
-    h->version = 1;
+    h->version = PSRAM_ACCEL_HEADER_VERSION;
     h->header_size = sizeof(header_t);
     h->num_elements = num_elements;
     h->sync = false;

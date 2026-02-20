@@ -5,6 +5,7 @@
 #include "unity.h"
 #include "utils/circular_buff.h"
 #include "utils/psram_accel_alloc.h"
+#include "hardware/hardware.h"
 
 /* ---- Unity hooks ---- */
 void setUp(void) {
@@ -33,6 +34,18 @@ void test_psram_get_memory(void);
 void test_psram_init(void);
 void test_write_to_psram(void);
 void test_read_from_psram(void);
+void test_light_sleep_memory_survival(void);   /* test_power.cpp */
+void test_light_sleep_bma_psram_survival(void); /* test_power.cpp */
+#endif
+
+/* ---- Declare test functions from test_integ_pipeline.cpp (ESP32 only) ---- */
+#ifdef ESP32
+void test_integ_accel_to_buffer(void);
+void test_integ_buffer_to_psram(void);
+void test_integ_full_pipeline(void);
+void test_integ_multi_block_accumulation(void);
+void test_integ_interleaved_fill_flush(void);
+void test_integ_buffer_overwrite_then_flush(void);
 #endif
 
 /* ---- Run all tests ---- */
@@ -60,6 +73,22 @@ static void run_all_tests(void) {
     RUN_TEST(test_read_from_psram);
 #endif
 
+    /* Power / sleep tests (device only, test_power.cpp) */
+#ifdef ESP32
+    RUN_TEST(test_light_sleep_memory_survival);
+    RUN_TEST(test_light_sleep_bma_psram_survival);
+#endif
+
+    /* Integration pipeline tests (device only) */
+#ifdef ESP32
+    RUN_TEST(test_integ_accel_to_buffer);
+    RUN_TEST(test_integ_buffer_to_psram);
+    RUN_TEST(test_integ_full_pipeline);
+    RUN_TEST(test_integ_multi_block_accumulation);
+    RUN_TEST(test_integ_interleaved_fill_flush);
+    RUN_TEST(test_integ_buffer_overwrite_then_flush);
+#endif
+
     UNITY_END();
 }
 
@@ -67,6 +96,7 @@ static void run_all_tests(void) {
 #ifdef ESP32
 #include <Arduino.h>
 void setup(void) {
+    hardware_test_init_bma();
     delay(2000);  /* let Serial connect before Unity output */
     run_all_tests();
 }
