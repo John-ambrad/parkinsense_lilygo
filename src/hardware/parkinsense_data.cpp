@@ -6,7 +6,7 @@
 #include "utils/psram_accel_alloc.h"
 #include <stdio.h>
 #ifndef NATIVE_64BIT
-#include "hardware/ble/gadgetbridge.h"
+#include "hardware/ble/parkinsense_ble.h"
 #include "hardware/blectl.h"
 #include "hardware/motion.h"
 #include "freertos/FreeRTOS.h"
@@ -20,7 +20,7 @@
 /** Max formatted JSON size per block (256 samples * ~30 chars + header). */
 #define PARKINSENSE_SEND_BUF_SIZE (12 * 1024)
 /** Task stack size and priority for the pipeline task. */
-#define PARKINSENSE_TASK_STACK 2048
+#define PARKINSENSE_TASK_STACK 4096
 #define PARKINSENSE_TASK_PRIO 1
 /** Delay between pipeline iterations (ms) – ~50 Hz sample rate. */
 #define PARKINSENSE_TASK_DELAY_MS 20
@@ -37,6 +37,7 @@ static callback_t* parkinsense_data_callback = NULL;
 static bma_accel_data_t parkinsense_block_buf[PARKINSENSE_PSRAM_BLOCK_SAMPLES];
 #ifndef NATIVE_64BIT
 static SemaphoreHandle_t parkinsense_psram_mutex = NULL;
+static uint32_t parkinsense_last_auto_send_ms = 0;
 static void parkinsense_task_loop(void* pv);
 #endif
 
@@ -70,6 +71,7 @@ void parkinsense_data_pipeline_start(void) {
     log_i("Parkinsense data pipeline started");
     parkinsense_data_pipeline_started = true;
 #ifndef NATIVE_64BIT
+    parkinsense_last_auto_send_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
     if (parkinsense_data_task_handle)
         vTaskResume(parkinsense_data_task_handle);
 #endif
@@ -119,68 +121,67 @@ void parkinsense_data_pipeline_reset(void) {
 
 void parkinsense_data_pipeline_send_data(void) {
 #ifndef NATIVE_64BIT
-    if (!blectl_get_event(BLECTL_CONNECT)) {
-        log_w("Parkinsense send: BLE not connected");
-        return;
-    }
     if (!parkinsense_psram_mutex) return;
-    if (xSemaphoreTake(parkinsense_psram_mutex, pdMS_TO_TICKS(2000)) != pdTRUE) {
+    if (xSemaphoreTake(parkinsense_psram_mutex, pdMS_TO_TICKS(500)) != pdTRUE) {
         log_w("Parkinsense send: mutex take timeout");
         return;
     }
-    unsigned sent = 0;
-    while (first_accel_block_ptr && sent < PSRAM_ACCEL_MAX_ITERATIONS) {
+    bool sent_ok = false;
+    if (first_accel_block_ptr) {
         header_t* block = first_accel_block_ptr;
-        sent++;
         if (!psram_validate_block(block)) {
             log_e("Parkinsense send: invalid block seq=%lu", (unsigned long)block->seq_num);
             psram_free_first_block();
-            continue;
+        } else {
+            bma_accel_data_t* samples = (bma_accel_data_t*)((char*)block + sizeof(header_t));
+            uint32_t n = block->num_elements;
+            if (n > PSRAM_ACCEL_MAX_ELEMENTS) {
+                psram_free_first_block();
+            } else {
+                size_t buf_size = sizeof(parkinsense_send_buf);
+                int len = 0;
+                int r = snprintf(parkinsense_send_buf, buf_size,
+                    "{\"t\":\"parkinsense\",\"seq\":%lu,\"start\":%lu,\"end\":%lu,\"n\":%lu,\"s\":[",
+                    (unsigned long)block->seq_num, (unsigned long)block->start_time_ms,
+                    (unsigned long)block->end_time_ms, (unsigned long)n);
+                if (r > 0 && (size_t)r < buf_size) {
+                    len = r;
+                    for (uint32_t i = 0; i < n; i++) {
+                        size_t rem = buf_size - (size_t)len;
+                        if (rem < 32) break;
+                        r = snprintf(parkinsense_send_buf + len, rem,
+                            "%s[%d,%d,%d,%lu]", i ? "," : "",
+                            (int)samples[i].x, (int)samples[i].y, (int)samples[i].z,
+                            (unsigned long)samples[i].timestamp_ms);
+                        if (r < 0 || (size_t)r >= rem) break;
+                        len += r;
+                    }
+                    if (len > 0 && (size_t)len < buf_size - 4) {
+                        r = snprintf(parkinsense_send_buf + len, buf_size - (size_t)len, "]}");
+                        if (r > 0) len += r;
+                    }
+                }
+                xSemaphoreGive(parkinsense_psram_mutex);
+                if (len > 0 && (size_t)len < buf_size) {
+                    sent_ok = parkinsense_ble_send(parkinsense_send_buf, (size_t)len);
+                    if (!sent_ok)
+                        log_w("Parkinsense send: BLE send failed (no client?)");
+                }
+                if (xSemaphoreTake(parkinsense_psram_mutex, pdMS_TO_TICKS(500)) == pdTRUE) {
+                    if (first_accel_block_ptr) {
+                        first_accel_block_ptr->sync = true;
+                        psram_free_first_block();
+                    }
+                    xSemaphoreGive(parkinsense_psram_mutex);
+                }
+                log_i("Parkinsense send: block done (len=%d, ok=%d)", len, (int)sent_ok);
+                if (parkinsense_data_callback)
+                    callback_send(parkinsense_data_callback, PARKINSENSE_SEND_DONE, NULL);
+                return;
+            }
         }
-        bma_accel_data_t* samples = (bma_accel_data_t*)((char*)block + sizeof(header_t));
-        uint32_t n = block->num_elements;
-        if (n > PSRAM_ACCEL_MAX_ELEMENTS) {
-            psram_free_first_block();
-            continue;
-        }
-        size_t buf_size = sizeof(parkinsense_send_buf);
-        int len = 0;
-        int r = snprintf(parkinsense_send_buf, buf_size,
-            "{\"t\":\"parkinsense\",\"seq\":%lu,\"start\":%lu,\"end\":%lu,\"n\":%lu,\"s\":[",
-            (unsigned long)block->seq_num, (unsigned long)block->start_time_ms,
-            (unsigned long)block->end_time_ms, (unsigned long)n);
-        if (r < 0 || (size_t)r >= buf_size) {
-            psram_free_first_block();
-            continue;
-        }
-        len = r;
-        for (uint32_t i = 0; i < n; i++) {
-            size_t rem = buf_size - (size_t)len;
-            if (rem < 32) break;
-            r = snprintf(parkinsense_send_buf + len, rem,
-                "%s[%d,%d,%d,%lu]", i ? "," : "",
-                (int)samples[i].x, (int)samples[i].y, (int)samples[i].z,
-                (unsigned long)samples[i].timestamp_ms);
-            if (r < 0 || (size_t)r >= rem) break;
-            len += r;
-        }
-        if (len > 0 && (size_t)len < buf_size - 4) {
-            r = snprintf(parkinsense_send_buf + len, buf_size - (size_t)len, "]}");
-            if (r > 0) len += r;
-        }
-        if (len > 0 && (size_t)len < buf_size) {
-            if (!gadgetbridge_send_msg("%s", parkinsense_send_buf))
-                log_w("Parkinsense send: gadgetbridge_send_msg failed");
-        }
-        block->sync = true;
-        psram_free_first_block();
     }
-    if (first_accel_block_ptr)
-        log_w("Parkinsense send: hit max iterations (%u), stopping", (unsigned)PSRAM_ACCEL_MAX_ITERATIONS);
     xSemaphoreGive(parkinsense_psram_mutex);
-    log_i("Parkinsense data pipeline send finished");
-    if (parkinsense_data_callback)
-        callback_send(parkinsense_data_callback, PARKINSENSE_SEND_DONE, NULL);
 #else
     log_i("Parkinsense data pipeline send (native stub)");
 #endif
@@ -190,10 +191,6 @@ void parkinsense_data_pipeline_send_data(void) {
 void parkinsense_data_pipeline_get_data(){
     bma_accel_data_t data = bma_get_accel();
     circular_buff_write(data, &parkinsense_data_pipeline_buff);
-    
-
-
-
 }
 
 /** Current number of samples in the pipeline circular buffer (0..PARKINSENSE_DATA_PIPELINE_BUFFER_SIZE). */
@@ -260,19 +257,16 @@ static void parkinsense_task_loop(void* pv) {
         if (parkinsense_data_pipeline_started) {
             parkinsense_data_pipeline_get_data();
             parkinsense_data_pipeline_drain_if_full();
+
+            uint32_t now = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
+            if (first_accel_block_ptr &&
+                (now - parkinsense_last_auto_send_ms) >= PARKINSENSE_AUTO_SEND_INTERVAL_MS) {
+                parkinsense_last_auto_send_ms = now;
+                parkinsense_data_pipeline_send_data();
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(PARKINSENSE_TASK_DELAY_MS));
     }
 }
 #endif
 
-void parkinsense_data_pipeline_task(void) {
-#ifndef NATIVE_64BIT
-    if (parkinsense_data_pipeline_started) {
-        parkinsense_data_pipeline_get_data();
-        parkinsense_data_pipeline_drain_if_full();
-    }
-#else
-    (void)0;
-#endif
-}

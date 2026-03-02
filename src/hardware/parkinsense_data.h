@@ -10,6 +10,8 @@
     #endif
 
     #define PARKINSENSE_DATA_UPDATE_INTERVAL 1000
+    /** How often (ms) the pipeline auto-sends PSRAM blocks over BLE. */
+    #define PARKINSENSE_AUTO_SEND_INTERVAL_MS 5000
 
     #ifndef _BV
     #define _BV(b) (1UL << (b))
@@ -25,7 +27,6 @@
     void parkinsense_data_pipeline_write_to_psram(void);
     void parkinsense_data_pipeline_drain_if_full(void);
     void parkinsense_data_pipeline_send_data(void);
-    void parkinsense_data_pipeline_task(void);
     int parkinsense_data_pipeline_buff_count(void);
     bool parkinsense_data_pipeline_is_started(void);
 

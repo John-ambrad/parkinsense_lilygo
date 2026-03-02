@@ -54,6 +54,7 @@
     #include "ble/blestepctl.h"
     #include "ble/gadgetbridge.h"
     #include "ble/deviceinfo.h"
+    #include "ble/parkinsense_ble.h"
 
     #include "NimBLEDescriptor.h"
 
@@ -225,6 +226,7 @@ void blectl_setup( void ) {
          */
         deviceinfo_setup();
         gadgetbridge_setup();
+        parkinsense_ble_setup();
         blebatctl_setup();
         blestepctl_setup();
         /*
