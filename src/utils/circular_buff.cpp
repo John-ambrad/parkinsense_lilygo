@@ -46,3 +46,8 @@ bool circular_buff_read(circular_buff_t* circ_buff,bma_accel_data_t* out){
     circ_buff->count--;
     return true;
 }
+
+int circular_buff_count(circular_buff_t* circ_buff) {
+    if (!circ_buff) return 0;
+    return circ_buff->count;
+}

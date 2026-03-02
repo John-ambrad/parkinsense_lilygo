@@ -271,6 +271,9 @@ void hardware_setup( void ) {
     sound_read_config();
     fakegps_setup();
     blectl_read_config();
+    #ifndef NO_BLUETOOTH
+        blectl_setup();
+    #endif
 
     splash_screen_stage_update( "init gui", 80 );
     splash_screen_stage_finish();
@@ -315,10 +318,6 @@ void hardware_post_setup( void ) {
     sound_setup();
     gpsctl_setup();
     powermgm_set_event( POWERMGM_WAKEUP );
-
-    #ifndef NO_BLUETOOTH
-        blectl_setup();
-    #endif
 
     display_set_brightness( display_get_brightness() );
 

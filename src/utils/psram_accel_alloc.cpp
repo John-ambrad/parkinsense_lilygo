@@ -35,7 +35,10 @@ void psram_init(void){
 }
 
 header_t* psram_write(int num_elements, bma_accel_data_t* buf){
-    void* ptr = MALLOC(sizeof(header_t) + (num_elements * sizeof(bma_accel_data_t)));
+    if (num_elements < 0 || (unsigned)num_elements > PSRAM_ACCEL_MAX_ELEMENTS)
+        return nullptr;
+    size_t payload_size = (size_t)num_elements * sizeof(bma_accel_data_t);
+    void* ptr = MALLOC(sizeof(header_t) + payload_size);
 
     if (!ptr) {
         log_w("No memory available for psram write");
@@ -116,8 +119,10 @@ header_t* create_header(int num_elements, bma_accel_data_t* buf, void* ptr){
 header_t* get_latest_block(void){
     if (!current_accel_block_ptr) return nullptr;
     header_t* current = (header_t*)current_accel_block_ptr;
-    while (current->next) {
+    unsigned n = 0;
+    while (current->next && n < PSRAM_ACCEL_MAX_ITERATIONS) {
         current = (header_t*)current->next;
+        n++;
     }
     return current;
 }
@@ -137,7 +142,9 @@ header_t *psram_read(int num_elements){
         log_w("Invalid magic number in latest block");
         return nullptr;
     }
-    size_t block_len = sizeof(header_t) + latest->num_elements * sizeof(bma_accel_data_t);
+    if (latest->num_elements > PSRAM_ACCEL_MAX_ELEMENTS)
+        return nullptr;
+    size_t block_len = sizeof(header_t) + (size_t)latest->num_elements * sizeof(bma_accel_data_t);
     if (latest->checksum != checksum_block_for_validate(latest, block_len)) {
         log_w("Invalid checksum in latest block");
         return nullptr;
@@ -147,4 +154,28 @@ header_t *psram_read(int num_elements){
         return nullptr;
     }
     return latest;
+}
+
+header_t* psram_free(header_t* block) {
+    if (!block) return nullptr;
+    free(block);
+    return nullptr;
+}
+
+/** Unlink and free the oldest block (first_accel_block_ptr). Call after sending its data. */
+void psram_free_first_block(void) {
+    if (!first_accel_block_ptr) return;
+    header_t* old = first_accel_block_ptr;
+    first_accel_block_ptr = (header_t*)old->next;
+    if (!first_accel_block_ptr)
+        current_accel_block_ptr = nullptr;
+    free(old);
+}
+
+/** Return true if block has valid magic, sane num_elements, and checksum. */
+bool psram_validate_block(header_t* block) {
+    if (!block || block->magic_number != PSRAM_ACCEL_HEADER_MAGIC) return false;
+    if (block->num_elements > PSRAM_ACCEL_MAX_ELEMENTS) return false;
+    size_t block_len = sizeof(header_t) + (size_t)block->num_elements * sizeof(bma_accel_data_t);
+    return block->checksum == checksum_block_for_validate(block, block_len);
 }
